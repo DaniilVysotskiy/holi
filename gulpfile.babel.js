@@ -1,25 +1,30 @@
-var gulp = require('gulp'),
-	less = require('gulp-less'),
-	sass = require('gulp-sass'),
-	sourcemaps = require('gulp-sourcemaps'),
-	autoprefixer = require('gulp-autoprefixer'),
-	minifycss = require('gulp-minify-css'),
-	rename = require('gulp-rename'),
-	notify = require('gulp-notify'),
-	reload = require('gulp-livereload'),
-	connect = require('gulp-connect'),
-	uglify = require('gulp-uglify'),
-	jshint = require('gulp-jshint'),
-	concat = require('gulp-concat'),
-	imagemin = require('gulp-imagemin'),
-	pngquant = require('imagemin-pngquant'),
+var	autoprefixer = require('gulp-autoprefixer'),
 	babel = require('gulp-babel'),
-	watch = require('gulp-watch'),
+	browserify = require('browserify'),
+	babelify = require('babelify'),
+	connect = require('gulp-connect'),
+	concat = require('gulp-concat'),
+	jshint = require('gulp-jshint'),
+	imagemin = require('gulp-imagemin'),
+	include = require("gulp-include"),
+ 	gulp = require('gulp'),
+ 	gutil = require('gulp-util'),
+	less = require('gulp-less'),
+	minifycss = require('gulp-minify-css'),
+	notify = require('gulp-notify'),
+	pngquant = require('imagemin-pngquant'),
 	postcss = require('gulp-postcss'),
+	rename = require('gulp-rename'),
+	reload = require('gulp-livereload'),
 	reporter = require('postcss-reporter'),
+	sass = require('gulp-sass'),
+	source = require('vinyl-source-stream'),
+	sourcemaps = require('gulp-sourcemaps'),
 	syntax_scss = require('postcss-scss'),
 	stylelint = require('stylelint'),
-	stylelintConfig = require('./stylelintConfig.js');
+	stylelintConfig = require('./stylelintConfig.js'),
+	uglify = require('gulp-uglify'),
+	watch = require('gulp-watch');
 
 
 //scss lint
@@ -33,10 +38,11 @@ gulp.task('scss-lint', function() {
 		})
 	];
 
-	return gulp.src(['build/sass/*.scss',
+	return gulp.src(['build/sass/**/*.scss',
       // Ignore linting vendor assets
       // Useful if you have bower components
-      '!bulid/sass/vendor/**/*.scss'])
+      '!build/sass/vendor/**/*.scss',
+      '!build/sass/bootstrap/**/*.scss'])
 	.pipe(postcss(processors, {syntax: syntax_scss}));
 });
 
@@ -61,7 +67,7 @@ gulp.task('sass', function() {
 gulp.task('styles', function() {
 	return gulp.src('build/less/style.less')
 	.pipe(less())
-	.pipe(autoprefixer('last 2 version', 'safari 5', 'ie 8', 'ie 9', 'opera 12.1', 'ios 6', 'android 4'))
+	.pipe(autoprefixer(['last 2 version', 'safari 5', 'ie 8', 'ie 9', 'opera 12.1', 'ios 6', 'android 4']))
 	.pipe(rename({
 		suffix: '.min'
 	}))
@@ -73,7 +79,6 @@ gulp.task('styles', function() {
 	}));
 });
 
-//img
 gulp.task('img', function () {
 	return gulp.src('build/img/*')
 	.pipe(imagemin({
@@ -107,13 +112,16 @@ gulp.task('html', function () {
 
 //js
 gulp.task('scripts', function() {
-	return gulp.src('build/js/my/*.js')
+	return gulp.src('build/js/my/**/*.js')
+	.pipe(include({
+		 extensions: "js"
+	}))
+	.on('error', console.log)
 	.pipe(babel({
 		presets: ['es2015']
 	}))
 	.pipe(jshint())
 	.pipe(jshint.reporter('default'))
-	.pipe(concat('app.js'))
 	.pipe(gulp.dest('assets/js'))
 	.pipe(rename({suffix: '.min'}))
 	.pipe(uglify())
@@ -122,11 +130,37 @@ gulp.task('scripts', function() {
 	.pipe(notify({ message: 'app.js' }));
 });
 
+
+
+// jsx
+gulp.task('jsx', function() {
+	return browserify({
+        entries: './build/js/my/app.jsx',
+        extensions: ['.jsx'],
+        debug: true
+    })
+    .transform('babelify', {
+        presets: ['es2015', 'react'],
+        plugins: ['transform-class-properties']
+    })
+    .bundle()
+    .on('error', function(err){
+        gutil.log(gutil.colors.red.bold('[browserify error]'));
+        gutil.log(err.message);
+        this.emit('end');
+    })
+    .pipe(source('bundle.js'))
+    .pipe(gulp.dest('./assets/js/'))
+    .pipe(connect.reload())
+	.pipe(notify({ message: 'jsx' }));;
+});
+
 //watcher
 gulp.task('watch', function () {
 	gulp.watch(['*.html'], ['html']);
 	gulp.watch(['build/js/my/*.js'], ['scripts']);
-	gulp.watch(['build/sass/*.scss'], ['scss-lint','sass']);
+	gulp.watch(['build/js/my/*.jsx'], ['jsx']);
+	gulp.watch(['build/sass/*.scss'], ['scss-lint', 'sass']);
 	gulp.watch(['build/less/*.less'], ['styles']);
 	gulp.watch(['build/img/*'], ['img']);
 });
