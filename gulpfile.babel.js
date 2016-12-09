@@ -51,6 +51,11 @@ gulp.task('sass', function() {
 	return gulp.src('build/sass/**/*.scss')  // Берем источник
 		.pipe(sourcemaps.init())
 		.pipe(sass()) // Проебразуем Sass в CSS посредством gulp-sass
+		.on('error', function(err){
+	        gutil.log(gutil.colors.red.bold('[Styles error]'));
+	        gutil.log(err.message);
+	        this.emit('end');
+	    })
 		.pipe(autoprefixer({browsers: ['last 2 version', 'safari 5', 'ie 8', 'ie 9', 'opera 12.1', 'ios 6', 'android 4']}))
 		.pipe(rename({suffix: '.min'}))
 		.pipe(sourcemaps.write())
@@ -116,10 +121,14 @@ gulp.task('scripts', function() {
 	.pipe(include({
 		 extensions: "js"
 	}))
-	.on('error', console.log)
 	.pipe(babel({
 		presets: ['es2015']
 	}))
+	.on('error', function(err){
+        gutil.log(gutil.colors.red.bold('[Script error]'));
+        gutil.log(err.message);
+        this.emit('end');
+    })
 	.pipe(jshint())
 	.pipe(jshint.reporter('default'))
 	.pipe(gulp.dest('assets/js'))
